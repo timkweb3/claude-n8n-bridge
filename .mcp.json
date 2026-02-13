@@ -2,7 +2,7 @@
   "mcpServers": {
     "n8n-mcp": {
       "command": "node",
-      "args": ["C:\\Users\\Node\\Desktop\\Projects\\n8n-mcp\\src\\index.js"],
+      "args": ["/c/Users/Node/Desktop/Projects/n8n-mcp/src/index.js"],
       "env": {
         "N8N_BASE_URL": "https://n8n.actionforce.us",
         "N8N_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxZDA2NzRlNi0wNjY4LTQzZmQtYmQ5Zi0xOWFkMThjZDY4MGEiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzcwNzU5MDMxfQ.VVgaql-HWD0a0_6w9ag337de3BXrMis2vcqSrn4HYzQ"

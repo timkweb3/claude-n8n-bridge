@@ -1,0 +1,435 @@
+{
+  "name": "WF11 Auto-Debugger",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "auto-debugger",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "b1110001-0001-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "auto-debugger-wf11"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://n8n.actionforce.us/api/v1/workflows/{{ $json.workflow_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "b1110001-0002-4000-8000-000000000002",
+      "name": "Fetch Workflow JSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://n8n.actionforce.us/api/v1/executions/{{ $('Webhook').item.json.execution_id }}?includeData=true",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "b1110001-0003-4000-8000-000000000003",
+      "name": "Fetch Execution Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhook = $('Webhook').item.json;\nconst workflowJson = $('Fetch Workflow JSON').item.json;\nconst executionData = $('Fetch Execution Details').item.json;\n\nconst workflowStr = JSON.stringify(workflowJson.nodes || workflowJson, null, 2);\nconst execStr = JSON.stringify(\n  executionData.data ? executionData.data.resultData : executionData,\n  null, 2\n).substring(0, 15000);\n\nconst prompt = 'You are an n8n workflow debugger. Analyze this workflow error and propose a fix.\\n\\n' +\n  '## Error Details\\n' +\n  '- Workflow: ' + webhook.workflow_name + ' (ID: ' + webhook.workflow_id + ')\\n' +\n  '- Failed Node: ' + webhook.node_name + '\\n' +\n  '- Error: ' + webhook.error_message + '\\n' +\n  '- Stack: ' + (webhook.error_stack || 'N/A') + '\\n' +\n  '- Severity: ' + webhook.severity + '\\n\\n' +\n  '## Workflow JSON\\n```json\\n' + workflowStr + '\\n```\\n\\n' +\n  '## Execution Data\\n```json\\n' + execStr + '\\n```\\n\\n' +\n  '## Instructions\\n' +\n  'Respond with ONLY valid JSON (no markdown, no code blocks) in this exact format:\\n' +\n  '{\\n' +\n  '  \"analysis\": \"Human-readable root cause explanation (2-3 sentences)\",\\n' +\n  '  \"fix_summary\": \"What changes need to be made\",\\n' +\n  '  \"fix_operations\": [\\n' +\n  '    {\\n' +\n  '      \"type\": \"updateNode\",\\n' +\n  '      \"nodeName\": \"Node Name Here\",\\n' +\n  '      \"updates\": {\\n' +\n  '        \"parameters\": { \"only_changed_params\": \"here\" }\\n' +\n  '      }\\n' +\n  '    }\\n' +\n  '  ],\\n' +\n  '  \"confidence\": \"high|medium|low\",\\n' +\n  '  \"risk\": \"Description of what could go wrong\"\\n' +\n  '}\\n\\n' +\n  'Rules:\\n' +\n  '- Only include parameters that need to change\\n' +\n  '- If no fix possible, return empty fix_operations and explain in analysis\\n' +\n  '- Never include credential changes';\n\nconst requestBody = {\n  model: 'claude-sonnet-4-5-20250929',\n  max_tokens: 4096,\n  messages: [{ role: 'user', content: prompt }]\n};\n\nreturn [{ json: { requestBody, webhook_data: webhook } }];"
+      },
+      "id": "b1110001-0004-4000-8000-000000000004",
+      "name": "Build Claude Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {}
+      },
+      "id": "b1110001-0005-4000-8000-000000000005",
+      "name": "Call Claude API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $json;\nconst webhookData = $('Build Claude Request').item.json.webhook_data;\n\nlet content = '';\ntry {\n  content = response.content[0].text;\n} catch (e) {\n  content = JSON.stringify(response);\n}\n\nlet parsed;\ntry {\n  const jsonMatch = content.match(/```json?\\s*([\\s\\S]*?)\\s*```/);\n  if (jsonMatch) {\n    parsed = JSON.parse(jsonMatch[1]);\n  } else {\n    parsed = JSON.parse(content);\n  }\n} catch (e) {\n  parsed = {\n    analysis: content.substring(0, 500),\n    fix_summary: 'Could not parse structured response from Claude',\n    fix_operations: [],\n    confidence: 'low',\n    risk: 'Response was not in expected JSON format'\n  };\n}\n\nreturn [{\n  json: {\n    timestamp: webhookData.timestamp || new Date().toISOString(),\n    workflow_name: webhookData.workflow_name,\n    workflow_id: webhookData.workflow_id,\n    execution_id: webhookData.execution_id,\n    execution_url: webhookData.execution_url || '',\n    error_message: webhookData.error_message,\n    node_name: webhookData.node_name || '',\n    severity: webhookData.severity || 'Unknown',\n    analysis: parsed.analysis || '',\n    fix_summary: parsed.fix_summary || '',\n    fix_operations: parsed.fix_operations || [],\n    fix_operations_json: JSON.stringify(parsed.fix_operations || []),\n    confidence: parsed.confidence || 'low',\n    risk: parsed.risk || ''\n  }\n}];"
+      },
+      "id": "b1110001-0006-4000-8000-000000000006",
+      "name": "Parse Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "__SPREADSHEET_ID__",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "WF Error Log",
+          "mode": "list",
+          "cachedResultName": "WF Error Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ $json.timestamp }}",
+            "Workflow Name": "={{ $json.workflow_name }}",
+            "Workflow ID": "={{ $json.workflow_id }}",
+            "Execution ID": "={{ $json.execution_id }}",
+            "Error Message": "={{ $json.error_message }}",
+            "Severity": "={{ $json.severity }}",
+            "Analysis": "={{ $json.analysis }}",
+            "Fix Summary": "={{ $json.fix_summary }}",
+            "Fix Operations": "={{ $json.fix_operations_json }}",
+            "Confidence": "={{ $json.confidence }}",
+            "Status": "Pending Approval",
+            "Applied At": "",
+            "Fix Result": "",
+            "GitHub Issue": ""
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Workflow Name",
+              "displayName": "Workflow Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Workflow ID",
+              "displayName": "Workflow ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Execution ID",
+              "displayName": "Execution ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Error Message",
+              "displayName": "Error Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Severity",
+              "displayName": "Severity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Analysis",
+              "displayName": "Analysis",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fix Summary",
+              "displayName": "Fix Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fix Operations",
+              "displayName": "Fix Operations",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Confidence",
+              "displayName": "Confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Applied At",
+              "displayName": "Applied At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fix Result",
+              "displayName": "Fix Result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "GitHub Issue",
+              "displayName": "GitHub Issue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1110001-0007-4000-8000-000000000007",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Parse Analysis').item.json;\nconst executionId = data.execution_id;\nconst hasFix = data.fix_operations_json !== '[]';\n\nlet msg = '<b>Auto-Debugger Analysis</b>\\n\\n';\nmsg += '<b>Workflow:</b> ' + data.workflow_name + '\\n';\nmsg += '<b>Failed Node:</b> ' + data.node_name + '\\n';\nmsg += '<b>Severity:</b> ' + data.severity + '\\n';\nmsg += '<b>Error:</b> ' + (data.error_message || '').substring(0, 200) + '\\n\\n';\nmsg += '<b>Analysis:</b>\\n' + data.analysis + '\\n\\n';\nmsg += '<b>Proposed Fix:</b>\\n' + data.fix_summary + '\\n\\n';\nmsg += '<b>Confidence:</b> ' + data.confidence + '\\n';\nmsg += '<b>Risk:</b> ' + data.risk + '\\n';\nif (data.execution_url) {\n  msg += '\\n<a href=\"' + data.execution_url + '\">View Execution</a>';\n}\n\nreturn [{\n  json: {\n    message_text: msg,\n    execution_id: executionId,\n    has_fix: hasFix\n  }\n}];"
+      },
+      "id": "b1110001-0008-4000-8000-000000000008",
+      "name": "Format Telegram Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "-5108825982",
+        "text": "={{ $json.message_text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "replyMarkup": "inlineKeyboard",
+          "inlineKeyboard": {
+            "rows": [
+              {
+                "row": {
+                  "values": [
+                    {
+                      "text": "Apply Fix",
+                      "additionalFields": {
+                        "callback_data": "={{ 'fix:' + $json.execution_id }}"
+                      }
+                    },
+                    {
+                      "text": "Skip",
+                      "additionalFields": {
+                        "callback_data": "={{ 'skip:' + $json.execution_id }}"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "id": "b1110001-0009-4000-8000-000000000009",
+      "name": "Send Telegram with Buttons",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2250,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Fetch Workflow JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Workflow JSON": {
+      "main": [
+        [
+          {
+            "node": "Fetch Execution Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Execution Details": {
+      "main": [
+        [
+          {
+            "node": "Build Claude Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Claude Request": {
+      "main": [
+        [
+          {
+            "node": "Call Claude API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Claude API": {
+      "main": [
+        [
+          {
+            "node": "Parse Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Analysis": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Format Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram with Buttons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

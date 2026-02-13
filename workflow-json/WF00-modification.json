@@ -1,0 +1,28 @@
+{
+  "_instructions": "Add this node to WF00 and connect 'Log to Notion' -> 'Trigger Auto-Debugger' (parallel with existing 'Check If Critical' connection)",
+  "newNode": {
+    "parameters": {
+      "method": "POST",
+      "url": "https://n8n.actionforce.us/webhook/auto-debugger",
+      "sendBody": true,
+      "specifyBody": "json",
+      "jsonBody": "={{ JSON.stringify({ workflow_id: $json.workflow_id, workflow_name: $json.workflow_name, execution_id: $json.execution_id, execution_url: $json.execution_url, error_message: $json.error_message, error_stack: $json.error_stack, node_name: $json.node_name, severity: $json.severity, timestamp: $json.timestamp }) }}",
+      "options": {
+        "timeout": 5000
+      }
+    },
+    "id": "d0e1f2a3-0010-4000-8000-100000000010",
+    "name": "Trigger Auto-Debugger",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.2,
+    "position": [
+      1500,
+      100
+    ]
+  },
+  "newConnection": {
+    "from": "Log to Notion",
+    "to": "Trigger Auto-Debugger",
+    "_note": "Log to Notion should now connect to BOTH 'Check If Critical' AND 'Trigger Auto-Debugger'"
+  }
+}

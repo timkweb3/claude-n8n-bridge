@@ -1,0 +1,129 @@
+{
+  "_description": "Canonical n8n node parameter formats — derived from n8n source code analysis. Use these as reference when building workflow JSON via API.",
+  "_source": "n8n GitHub: packages/nodes-base/nodes/If/V2/IfV2.node.ts, packages/nodes-base/nodes/Switch/V3/SwitchV3.node.ts, packages/workflow/src/interfaces.ts",
+
+  "if_node_v2.2": {
+    "_notes": "IF node typeVersion 2.2 requires options.version: 2. Each condition needs a UUID id.",
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.2,
+    "parameters": {
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict",
+          "version": 2
+        },
+        "conditions": [
+          {
+            "id": "UUID-v4-here",
+            "leftValue": "={{ $json.fieldName }}",
+            "rightValue": "expectedValue",
+            "operator": {
+              "type": "string",
+              "operation": "equals",
+              "name": "filter.operator.equals"
+            }
+          }
+        ],
+        "combinator": "and"
+      },
+      "options": {}
+    },
+    "_version_mapping": {
+      "typeVersion_2.0_2.1": "options.version = 1",
+      "typeVersion_2.2": "options.version = 2",
+      "typeVersion_2.3": "options.version = 3"
+    },
+    "_available_string_operations": [
+      "exists (singleValue: true)", "notExists (singleValue: true)",
+      "empty (singleValue: true)", "notEmpty (singleValue: true)",
+      "equals", "notEquals", "contains", "notContains",
+      "startsWith", "notStartsWith", "endsWith", "notEndsWith",
+      "regex", "notRegex"
+    ],
+    "_available_number_operations": [
+      "exists", "notExists", "empty", "notEmpty",
+      "equals", "notEquals", "gt", "lt", "gte", "lte"
+    ],
+    "_connections": {
+      "output_0": "true branch",
+      "output_1": "false branch"
+    }
+  },
+
+  "switch_node_v3.2": {
+    "_notes": "Switch node typeVersion 3.2 requires options.version: 2 in each rule's conditions. Use fallbackOutput: 'extra' for catch-all output.",
+    "type": "n8n-nodes-base.switch",
+    "typeVersion": 3.2,
+    "parameters": {
+      "rules": {
+        "values": [
+          {
+            "conditions": {
+              "options": {
+                "caseSensitive": true,
+                "leftValue": "",
+                "typeValidation": "strict",
+                "version": 2
+              },
+              "conditions": [
+                {
+                  "id": "UUID-v4-here",
+                  "leftValue": "={{ $json.fieldName }}",
+                  "rightValue": "matchValue",
+                  "operator": {
+                    "type": "string",
+                    "operation": "equals",
+                    "name": "filter.operator.equals"
+                  }
+                }
+              ],
+              "combinator": "and"
+            },
+            "renameOutput": true,
+            "outputKey": "OutputName"
+          }
+        ]
+      },
+      "options": {
+        "fallbackOutput": "extra"
+      }
+    },
+    "_version_mapping": {
+      "typeVersion_3.0_3.1": "options.version = 1",
+      "typeVersion_3.2_3.3": "options.version = 2",
+      "typeVersion_3.4": "options.version = 3"
+    },
+    "_connections": {
+      "output_0": "first rule match",
+      "output_1": "second rule match",
+      "output_N": "Nth rule match",
+      "output_N+1": "fallback (when fallbackOutput: 'extra')"
+    },
+    "_options": {
+      "fallbackOutput": "'none' | 'extra' | integer (route to specific output)",
+      "ignoreCase": "boolean (optional)",
+      "allMatchingOutputs": "boolean (optional, send to all vs first match)"
+    }
+  },
+
+  "set_node_v3.4": {
+    "_notes": "Set node v3.4. Do NOT use includeOtherFields — include defaults to 'all' already.",
+    "type": "n8n-nodes-base.set",
+    "typeVersion": 3.4,
+    "parameters": {
+      "assignments": {
+        "assignments": [
+          {
+            "id": "UUID-v4-here",
+            "name": "fieldName",
+            "value": "fieldValue or ={{ expression }}",
+            "type": "string"
+          }
+        ]
+      },
+      "options": {}
+    }
+  }
+}

@@ -1,0 +1,504 @@
+{
+  "name": "WF00 Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "d0e1f2a3-0001-4000-8000-100000000001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0b1c2d3-0001-4000-8000-200000000001",
+              "name": "workflow_name",
+              "value": "={{ $json.workflow.name }}",
+              "type": "string"
+            },
+            {
+              "id": "a0b1c2d3-0001-4000-8000-200000000002",
+              "name": "workflow_id",
+              "value": "={{ $json.workflow.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a0b1c2d3-0001-4000-8000-200000000003",
+              "name": "execution_id",
+              "value": "={{ $json.execution.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a0b1c2d3-0001-4000-8000-200000000004",
+              "name": "execution_url",
+              "value": "={{ $json.execution.url }}",
+              "type": "string"
+            },
+            {
+              "id": "a0b1c2d3-0001-4000-8000-200000000005",
+              "name": "error_message",
+              "value": "={{ $json.execution.error.description ? $json.execution.error.description : $json.execution.error.message }}",
+              "type": "string"
+            },
+            {
+              "id": "a0b1c2d3-0001-4000-8000-200000000006",
+              "name": "error_stack",
+              "value": "={{ $json.execution.error.stack }}",
+              "type": "string"
+            },
+            {
+              "id": "a0b1c2d3-0001-4000-8000-200000000007",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "a0b1c2d3-0001-4000-8000-200000000008",
+              "name": "node_name",
+              "value": "={{ $json.execution.error.node ? $json.execution.error.node.name : 'Unknown' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d0e1f2a3-0002-4000-8000-100000000002",
+      "name": "Extract Error Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f0000001-0101-4000-8000-000000000001",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "econnrefused",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  },
+                  {
+                    "id": "f0000001-0102-4000-8000-000000000002",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "etimedout",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  },
+                  {
+                    "id": "f0000001-0103-4000-8000-000000000003",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "authentication",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  },
+                  {
+                    "id": "f0000001-0104-4000-8000-000000000004",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "credential",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  },
+                  {
+                    "id": "f0000001-0105-4000-8000-000000000005",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "rate limit",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  },
+                  {
+                    "id": "f0000001-0106-4000-8000-000000000006",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "500",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  },
+                  {
+                    "id": "f0000001-0107-4000-8000-000000000007",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "503",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "Critical"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f0000001-0201-4000-8000-000000000008",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "timeout",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  },
+                  {
+                    "id": "f0000001-0202-4000-8000-000000000009",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "retry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  },
+                  {
+                    "id": "f0000001-0203-4000-8000-000000000010",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "partial",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  },
+                  {
+                    "id": "f0000001-0204-4000-8000-000000000011",
+                    "leftValue": "={{ $json.error_message }}",
+                    "rightValue": "404",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains",
+                      "name": "filter.operator.contains"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              },
+              "renameOutput": true,
+              "outputKey": "Warning"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "d0e1f2a3-0003-4000-8000-100000000003",
+      "name": "Classify Severity",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0b1c2d3-0004-4000-8000-200000000001",
+              "name": "severity",
+              "value": "Critical",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d0e1f2a3-0004-4000-8000-100000000004",
+      "name": "Set Critical",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0b1c2d3-0005-4000-8000-200000000001",
+              "name": "severity",
+              "value": "Warning",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d0e1f2a3-0005-4000-8000-100000000005",
+      "name": "Set Warning",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0b1c2d3-0006-4000-8000-200000000001",
+              "name": "severity",
+              "value": "Info",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d0e1f2a3-0006-4000-8000-100000000006",
+      "name": "Set Info",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1000,
+        500
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d0e1f2a3-0007-4000-8000-100000000007",
+      "name": "Log to Notion",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f0000002-0001-4000-8000-000000000001",
+              "leftValue": "={{ $json.severity }}",
+              "rightValue": "Critical",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d0e1f2a3-0008-4000-8000-100000000008",
+      "name": "Check If Critical",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "-5108825982",
+        "text": "=🚨 CRITICAL WORKFLOW ERROR\n\nWorkflow: {{ $json.workflow_name }}\nNode: {{ $json.node_name }}\nError: {{ $json.error_message }}\n\nExecution: {{ $json.execution_url }}\nTime: {{ $json.timestamp }}"
+      },
+      "id": "d0e1f2a3-0009-4000-8000-100000000009",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.actionforce.us/webhook/auto-debugger",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow_id: $json.workflow_id, workflow_name: $json.workflow_name, execution_id: $json.execution_id, execution_url: $json.execution_url, error_message: $json.error_message, error_stack: $json.error_stack, node_name: $json.node_name, severity: $json.severity, timestamp: $json.timestamp }) }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "d0e1f2a3-0010-4000-8000-100000000010",
+      "name": "Trigger Auto-Debugger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Error Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Error Data": {
+      "main": [
+        [
+          {
+            "node": "Classify Severity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Severity": {
+      "main": [
+        [
+          {
+            "node": "Set Critical",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Warning",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Critical": {
+      "main": [
+        [
+          {
+            "node": "Log to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Warning": {
+      "main": [
+        [
+          {
+            "node": "Log to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Info": {
+      "main": [
+        [
+          {
+            "node": "Log to Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Notion": {
+      "main": [
+        [
+          {
+            "node": "Check If Critical",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Trigger Auto-Debugger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Critical": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

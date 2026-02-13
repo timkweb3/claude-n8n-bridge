@@ -1,0 +1,51 @@
+{
+  "name": "TEST - IF and Switch format capture",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e0000001-0001-4000-8000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {},
+      "id": "e0000001-0002-4000-8000-000000000002",
+      "name": "Test IF",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {},
+      "id": "e0000001-0003-4000-8000-000000000003",
+      "name": "Test Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {},
+      "id": "e0000001-0004-4000-8000-000000000004",
+      "name": "End",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Test IF", "type": "main", "index": 0 }]]
+    },
+    "Test IF": {
+      "main": [[{ "node": "Test Switch", "type": "main", "index": 0 }], []]
+    },
+    "Test Switch": {
+      "main": [[{ "node": "End", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

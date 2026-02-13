@@ -1,0 +1,497 @@
+{
+  "name": "WF12 Fix Deployer",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "callback_query"
+        ]
+      },
+      "id": "b1120001-0001-4000-8000-000000000001",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "wf12-telegram-trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\nconst callbackQuery = input.callback_query || input;\nconst queryId = callbackQuery.id || input.callback_query_id || '';\nconst data = callbackQuery.data || input.data || '';\nconst chatId = (callbackQuery.message && callbackQuery.message.chat && callbackQuery.message.chat.id) || '';\nconst messageId = (callbackQuery.message && callbackQuery.message.message_id) || '';\n\nconst parts = data.split(':');\nconst action = parts[0] || '';\nconst executionId = parts.slice(1).join(':') || '';\n\nreturn [{\n  json: {\n    callback_query_id: queryId,\n    action: action,\n    execution_id: executionId,\n    chat_id: String(chatId),\n    message_id: String(messageId),\n    raw_data: data\n  }\n}];"
+      },
+      "id": "b1120001-0002-4000-8000-000000000002",
+      "name": "Parse Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $json.callback_query_id }}",
+        "additionalFields": {}
+      },
+      "id": "b1120001-0003-4000-8000-000000000003",
+      "name": "Answer Callback Query",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1120001-0001-4000-8000-000000000001",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "fix",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b1120001-0004-4000-8000-000000000004",
+      "name": "Route Decision",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "__SPREADSHEET_ID__",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "WF Error Log",
+          "mode": "list",
+          "cachedResultName": "WF Error Log"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Execution ID",
+              "lookupValue": "={{ $('Parse Callback').item.json.execution_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1120001-0005-4000-8000-000000000005",
+      "name": "Read Fix from GSheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1250,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://n8n.actionforce.us/api/v1/workflows/{{ $json['Workflow ID'] || $json.workflow_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "b1120001-0006-4000-8000-000000000006",
+      "name": "Fetch Current Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fixData = $('Read Fix from GSheets').item.json;\nconst currentWorkflow = $('Fetch Current Workflow').item.json;\n\nlet fixOps;\ntry {\n  const opsRaw = fixData['Fix Operations'] || fixData.fix_operations_json || '[]';\n  fixOps = JSON.parse(opsRaw);\n} catch (e) {\n  return [{\n    json: {\n      success: false,\n      error: 'Could not parse fix operations: ' + e.message,\n      workflow_id: fixData['Workflow ID'] || fixData.workflow_id || ''\n    }\n  }];\n}\n\nif (!fixOps || fixOps.length === 0) {\n  return [{\n    json: {\n      success: false,\n      error: 'No fix operations to apply',\n      workflow_id: fixData['Workflow ID'] || fixData.workflow_id || ''\n    }\n  }];\n}\n\n// Build credential map from current workflow\nconst credentialMap = {};\nif (currentWorkflow.nodes) {\n  for (const node of currentWorkflow.nodes) {\n    if (node.credentials) {\n      credentialMap[node.name] = JSON.parse(JSON.stringify(node.credentials));\n    }\n  }\n}\n\n// Apply fix operations\nconst updatedNodes = JSON.parse(JSON.stringify(currentWorkflow.nodes || []));\nconst changes = [];\n\nfor (const op of fixOps) {\n  if (op.type === 'updateNode' && op.nodeName) {\n    const nodeIdx = updatedNodes.findIndex(n => n.name === op.nodeName);\n    if (nodeIdx >= 0 && op.updates) {\n      const before = JSON.stringify(updatedNodes[nodeIdx].parameters);\n      if (op.updates.parameters) {\n        updatedNodes[nodeIdx].parameters = {\n          ...updatedNodes[nodeIdx].parameters,\n          ...op.updates.parameters\n        };\n      }\n      changes.push('Updated ' + op.nodeName + ': ' + before.substring(0, 100) + ' -> ' + JSON.stringify(updatedNodes[nodeIdx].parameters).substring(0, 100));\n    }\n  }\n}\n\n// Re-inject ALL credentials\nfor (const node of updatedNodes) {\n  if (credentialMap[node.name]) {\n    node.credentials = credentialMap[node.name];\n  }\n}\n\nconst mergedWorkflow = { ...currentWorkflow, nodes: updatedNodes };\ndelete mergedWorkflow.id;\ndelete mergedWorkflow.createdAt;\ndelete mergedWorkflow.updatedAt;\ndelete mergedWorkflow.versionId;\n\nreturn [{\n  json: {\n    success: true,\n    mergedWorkflow: mergedWorkflow,\n    changesDiff: changes.join('\\n'),\n    credentialsPreserved: Object.keys(credentialMap).length > 0,\n    workflow_id: fixData['Workflow ID'] || fixData.workflow_id || currentWorkflow.id || '',\n    workflow_name: fixData['Workflow Name'] || fixData.workflow_name || currentWorkflow.name || '',\n    execution_id: fixData['Execution ID'] || fixData.execution_id || '',\n    error_message: fixData['Error Message'] || fixData.error_message || '',\n    analysis: fixData['Analysis'] || fixData.analysis || '',\n    fix_summary: fixData['Fix Summary'] || fixData.fix_summary || ''\n  }\n}];"
+      },
+      "id": "b1120001-0007-4000-8000-000000000007",
+      "name": "Apply Fix",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1750,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://n8n.actionforce.us/api/v1/workflows/{{ $json.workflow_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.mergedWorkflow) }}",
+        "options": {}
+      },
+      "id": "b1120001-0008-4000-8000-000000000008",
+      "name": "PUT Updated Workflow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "issue",
+        "operation": "create",
+        "owner": "timkweb3",
+        "repository": "claude-n8n-bridge",
+        "title": "={{ '[Auto-Fix] ' + $('Apply Fix').item.json.workflow_name + ': ' + ($('Apply Fix').item.json.error_message || '').substring(0, 60) }}",
+        "body": "={{ '## Auto-Fix Applied\\n\\n' + '**Workflow:** ' + $('Apply Fix').item.json.workflow_name + '\\n' + '**Execution ID:** ' + $('Apply Fix').item.json.execution_id + '\\n\\n' + '### Analysis\\n' + $('Apply Fix').item.json.analysis + '\\n\\n' + '### Fix Applied\\n' + $('Apply Fix').item.json.fix_summary + '\\n\\n' + '### Changes\\n```\\n' + $('Apply Fix').item.json.changesDiff + '\\n```\\n\\n' + '### Credential Preservation\\n' + ($('Apply Fix').item.json.credentialsPreserved ? 'Credentials preserved successfully' : 'No credentials to preserve') }}",
+        "labels": {
+          "label": [
+            "auto-fix",
+            "self-healing"
+          ]
+        },
+        "additionalFields": {}
+      },
+      "id": "b1120001-0009-4000-8000-000000000009",
+      "name": "Create GitHub Issue",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [
+        2250,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "__SPREADSHEET_ID__",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "WF Error Log",
+          "mode": "list",
+          "cachedResultName": "WF Error Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Execution ID": "={{ $('Apply Fix').item.json.execution_id }}",
+            "Status": "={{ $('Apply Fix').item.json.success ? 'Applied' : 'Failed' }}",
+            "Applied At": "={{ $now.toISO() }}",
+            "Fix Result": "={{ $('Apply Fix').item.json.success ? 'Success: ' + $('Apply Fix').item.json.changesDiff : 'Failed: ' + ($('Apply Fix').item.json.error || 'Unknown error') }}",
+            "GitHub Issue": "={{ $json.html_url || $json.url || '' }}"
+          },
+          "matchingColumns": [
+            "Execution ID"
+          ],
+          "schema": [
+            {
+              "id": "Execution ID",
+              "displayName": "Execution ID",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Applied At",
+              "displayName": "Applied At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fix Result",
+              "displayName": "Fix Result",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "GitHub Issue",
+              "displayName": "GitHub Issue",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1120001-0010-4000-8000-000000000010",
+      "name": "Update GSheets Applied",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2500,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "-5108825982",
+        "text": "={{ $('Apply Fix').item.json.success ? '<b>Fix Applied Successfully</b>\\n\\nWorkflow: ' + $('Apply Fix').item.json.workflow_name + '\\nChanges: ' + $('Apply Fix').item.json.changesDiff + '\\nCredentials preserved: ' + ($('Apply Fix').item.json.credentialsPreserved ? 'Yes' : 'N/A') + '\\n\\nGitHub Issue: ' + ($json['GitHub Issue'] || $json.html_url || 'N/A') : '<b>Fix Failed</b>\\n\\n' + ($('Apply Fix').item.json.error || 'Unknown error') }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "b1120001-0011-4000-8000-000000000011",
+      "name": "Send Confirmation",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2750,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "__SPREADSHEET_ID__",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "WF Error Log",
+          "mode": "list",
+          "cachedResultName": "WF Error Log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Execution ID": "={{ $('Parse Callback').item.json.execution_id }}",
+            "Status": "Skipped"
+          },
+          "matchingColumns": [
+            "Execution ID"
+          ],
+          "schema": [
+            {
+              "id": "Execution ID",
+              "displayName": "Execution ID",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1120001-0012-4000-8000-000000000012",
+      "name": "Update GSheets Skipped",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1250,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "-5108825982",
+        "text": "={{ 'Fix skipped for execution ' + $('Parse Callback').item.json.execution_id }}",
+        "additionalFields": {}
+      },
+      "id": "b1120001-0013-4000-8000-000000000013",
+      "name": "Send Skip Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1500,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Callback": {
+      "main": [
+        [
+          {
+            "node": "Answer Callback Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Callback Query": {
+      "main": [
+        [
+          {
+            "node": "Route Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Decision": {
+      "main": [
+        [
+          {
+            "node": "Read Fix from GSheets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update GSheets Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Fix from GSheets": {
+      "main": [
+        [
+          {
+            "node": "Fetch Current Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Current Workflow": {
+      "main": [
+        [
+          {
+            "node": "Apply Fix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Fix": {
+      "main": [
+        [
+          {
+            "node": "PUT Updated Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PUT Updated Workflow": {
+      "main": [
+        [
+          {
+            "node": "Create GitHub Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GitHub Issue": {
+      "main": [
+        [
+          {
+            "node": "Update GSheets Applied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update GSheets Applied": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update GSheets Skipped": {
+      "main": [
+        [
+          {
+            "node": "Send Skip Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
