@@ -26,12 +26,13 @@ The project uses multiple MCP servers configured in `.mcp.json`. After pulling o
 |--------|---------|-------------------|
 | `n8n-api` | Workflow CRUD, execution, webhooks via n8n REST API | N8N_API_KEY (configured) |
 | `n8n-knowledge` | Node documentation for 1,084 nodes, property validation, config examples (czlonkowski/n8n-mcp) | None |
-| `google-workspace` | Gmail, Calendar, Sheets, Drive access (taylorwilsdon/google_workspace_mcp) | Google OAuth Client ID + Secret |
-| `dbhub` | Universal database gateway — Postgres, MySQL, SQLite (bytebase/dbhub) | Database connection string (DSN) |
 | `playwright` | Browser automation for testing webhooks and verifying workflow outputs (microsoft/playwright-mcp) | None |
-| `browser-tools` | Console logs, network monitoring, screenshots (AgentDeskAI/browser-tools-mcp) | Chrome Extension + middleware server |
-| `slack` | Slack channel access, search, message posting (korotovsky/slack-mcp-server) | Slack XOXC + XOXD tokens |
 | `rest-api` | Direct REST API testing for webhook endpoints (dkmaker/mcp-rest-api) | None (base URL pre-set to n8n instance) |
+
+**Available to add later (need credentials):**
+- `google-workspace` (taylorwilsdon/google_workspace_mcp) — needs Google OAuth Client ID + Secret
+- `dbhub` (bytebase/dbhub) — needs database DSN
+- `slack` (korotovsky/slack-mcp-server) — needs Slack XOXC + XOXD tokens
 
 ## Claude Code Skills (n8n)
 

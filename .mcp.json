@@ -17,37 +17,9 @@
         "DISABLE_CONSOLE_OUTPUT": "true"
       }
     },
-    "google-workspace": {
-      "command": "uvx",
-      "args": ["workspace-mcp"],
-      "env": {
-        "GOOGLE_OAUTH_CLIENT_ID": "REPLACE_WITH_YOUR_CLIENT_ID",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "REPLACE_WITH_YOUR_CLIENT_SECRET",
-        "OAUTHLIB_INSECURE_TRANSPORT": "1"
-      }
-    },
-    "dbhub": {
-      "command": "npx",
-      "args": ["@bytebase/dbhub@latest", "--transport", "stdio", "--dsn", "REPLACE_WITH_YOUR_DSN"],
-      "env": {
-        "READONLY": "true"
-      }
-    },
     "playwright": {
       "command": "npx",
       "args": ["@playwright/mcp@latest", "--headless"]
-    },
-    "browser-tools": {
-      "command": "npx",
-      "args": ["@agentdeskai/browser-tools-mcp@latest"]
-    },
-    "slack": {
-      "command": "npx",
-      "args": ["-y", "slack-mcp-server@latest", "--transport", "stdio"],
-      "env": {
-        "SLACK_MCP_XOXC_TOKEN": "REPLACE_WITH_YOUR_XOXC_TOKEN",
-        "SLACK_MCP_XOXD_TOKEN": "REPLACE_WITH_YOUR_XOXD_TOKEN"
-      }
     },
     "rest-api": {
       "command": "npx",
